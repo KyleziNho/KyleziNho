@@ -43,6 +43,7 @@ for (const f of walk(desktop)) {
 }
 
 const msgs = new Map() // message id -> { day, model, total }
+let rawLines = 0 // what /stats sums: every logged line, duplicates included
 for (const dir of new Set(claudeDirs)) {
   for (const f of walk(dir)) {
     for (const e of lines(f)) {
@@ -52,6 +53,7 @@ for (const dir of new Set(claudeDirs)) {
       if (model === '<synthetic>') continue
       const total = (u.input_tokens ?? 0) + (u.output_tokens ?? 0) +
         (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0)
+      rawLines += total
       // streamed messages are logged several times under one id; keep the largest
       const key = `${e.message.id}:${e.requestId ?? ''}`
       const prev = msgs.get(key)
@@ -69,8 +71,12 @@ for (const m of msgs.values()) {
 }
 
 // --- /stats cache ----------------------------------------------------------
-// dailyModelTokens there excludes cache reads, so scale each day by the
-// model's overall all-tokens / counted-tokens ratio from modelUsage.
+// /stats sums every transcript line, and each API response is logged once per
+// content block (~2x). Deflate its numbers by the duplication we measure here.
+const dedupedTotal = [...msgs.values()].reduce((n, m) => n + m.total, 0)
+const dup = dedupedTotal ? rawLines / dedupedTotal : 2
+// Older cache versions' dailyModelTokens excluded cache reads, so scale each
+// day by the model's all-tokens / counted-tokens ratio from modelUsage.
 try {
   const sc = JSON.parse(fs.readFileSync(path.join(HOME, '.claude', 'stats-cache.json'), 'utf8'))
   const ratio = {}
@@ -82,9 +88,9 @@ try {
   for (const d of sc.dailyModelTokens ?? []) {
     for (const [model, n] of Object.entries(d.tokensByModel)) {
       const s = slot(d.date)
-      const v = Math.round(n * (ratio[model] ?? 1))
+      const v = Math.round((n * (ratio[model] ?? 1)) / dup)
       s.cache += v
-      s.models[model] = (s.models[model] ?? 0) + v
+      if (!s.claude) s.models[model] = (s.models[model] ?? 0) + v
     }
   }
 } catch {}
@@ -109,8 +115,8 @@ let ledger = { days: {} }
 try { ledger = JSON.parse(fs.readFileSync(LEDGER, 'utf8')) } catch {}
 for (const [d, s] of Object.entries(fresh)) {
   const o = (ledger.days[d] ??= { claude: 0, codex: 0, est: 0, models: {} })
-  // transcripts and stats-cache overlap; take whichever saw more of the day
-  o.claude = Math.max(o.claude, s.claude, s.cache)
+  // transcripts are exact; the stats-cache only fills days they no longer cover
+  o.claude = Math.max(o.claude, s.claude || s.cache)
   o.codex = Math.max(o.codex, s.codex)
   for (const [m, n] of Object.entries(s.models)) o.models[m] = Math.max(o.models[m] ?? 0, n)
 }
@@ -138,6 +144,7 @@ let manual = []
 try { manual = JSON.parse(fs.readFileSync(MANUAL, 'utf8')) } catch {}
 
 ledger.perPrompt = Math.round(perPrompt)
+ledger.statsDup = Number(dup.toFixed(3))
 ledger.manual = manual
 ledger.updated = new Date().toISOString()
 ledger.days = Object.fromEntries(Object.entries(ledger.days).sort())
