@@ -239,7 +239,8 @@ out.push(hr(y))
 
 // tokens
 const goal = milestone(tokens)
-out.push(label(P, y + 34, 'TOKEN SPEND', `claude code + codex · since ${monY(firstDay)}`))
+// rough API-equivalent cost: ~$0.785 per 1M tokens, from the measured model/cache mix
+out.push(label(P, y + 34, 'TOKEN SPEND', `claude code + codex · since ${monY(firstDay)} · ≈ $${Math.round((tokens / 1e6) * 0.785 / 1000)}k at API prices`))
 const odo = odometer(fmt(tokens), P, y + 58, 7)
 out.push(odo.svg)
 out.push(text(P + odo.width + 24, y + 96, `≈ ${(tokens / 1e9).toFixed(2)} billion tokens`, { size: 15, fill: C.fg, cls: 'fade d3' }))
