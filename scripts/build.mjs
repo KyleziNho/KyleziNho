@@ -92,7 +92,7 @@ const ago = (iso) => {
   return h < 24 ? `${Math.max(1, Math.round(h))}h ago` : h < 24 * 60 ? `${Math.round(h / 24)}d ago` : `${Math.round(h / 24 / 30)}mo ago`
 }
 const short = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : fmt(n)
-const milestone = (n) => { const e = 10 ** Math.floor(Math.log10(n)); return [1, 2, 5, 10].map((m) => m * e).find((m) => m > n) }
+const milestone = (n) => { const e = 10 ** Math.floor(Math.log10(n)); return [1, 2, 2.5, 5, 10].map((m) => m * e).find((m) => m > n) }
 
 const text = (x, y, s, { size = 13, fill = C.dim, anchor = 'start', weight = 400, cls = '', ls = 0 } = {}) =>
   `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" font-weight="${weight}"${ls ? ` letter-spacing="${ls}"` : ''}${cls ? ` class="${cls}"` : ''}>${esc(s)}</text>`
